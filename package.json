@@ -1,0 +1,29 @@
+{
+  "name": "puppeteer-web-auto",
+  "version": "1.0.0",
+  "description": "web automation by puppeteer",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goldminer1030/puppeteer-web-auto.git"
+  },
+  "keywords": [
+    "puppeteer",
+    "node",
+    "web",
+    "automation"
+  ],
+  "author": "goldminer1030",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/goldminer1030/puppeteer-web-auto/issues"
+  },
+  "homepage": "https://github.com/goldminer1030/puppeteer-web-auto#readme",
+  "dependencies": {
+    "puppeteer": "^1.19.0"
+  }
+}
