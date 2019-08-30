@@ -7,7 +7,12 @@ const puppeteer = require('puppeteer')
       headless: true,
     })
     const api_key = "ztycfcgjvmeloqeadofkxuiy4nudqr21";
+    const TEST_MODE = true;
     const page = await browser.newPage();
+    const client = await page.target().createCDPSession();
+    await client.send('Network.clearBrowserCookies');
+    await client.send('Network.clearBrowserCache');
+    const looksSame = require('looks-same');
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setDefaultNavigationTimeout(20000);
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36')
@@ -23,34 +28,64 @@ const puppeteer = require('puppeteer')
     });
 
     //connect to Site
-    await page.goto('https://www.att.com/prepaid/activations/#/activate.html')
+    await page.goto('https://www.att.com/prepaid/activations');
 
-    //take screenshot
-    await page.screenshot({ path: 'loaded.png', fullPage: true });
+    if (TEST_MODE) {
+      //take screenshot
+      await page.screenshot({ path: 'loaded.png', fullPage: true });
+    }
 
     //check if captcha is visible
     if ((await page.$('#captcha')) !== null) {
-      console.log("Captcha Exists");
+      if (TEST_MODE) {
+        console.log("Captcha Exists");
+      }
       captcha_text = '';
-
-      // refresh captcha
-      await page.waitForXPath('//img[contains(@src,"images/refresh-captcha.png")]', 5000);
-      const [refresh_captcha] = await page.$x('//img[contains(@src,"images/refresh-captcha.png")]');
-      if (refresh_captcha) refresh_captcha.click();
-
-      console.log('Clicked refresh captcha icon');
-      await page.waitFor(5000);
-      console.log('Waited for 5 seconds');
-
-      //take screenshot
-      await page.screenshot({ path: 'refresh-captcha.png', fullPage: true });
 
       // get captcha image
       await page.waitForXPath('//img[contains(@src,"/prepaid/activations/services/resources/acceptance/captcha/getImage?app=prepaid")]', 5000);
       const [captcha_image] = await page.$x('//img[contains(@src,"/prepaid/activations/services/resources/acceptance/captcha/getImage?app=prepaid")]');
-      
       if (captcha_image) {
-        await captcha_image.screenshot({ path: "captcha.png" });
+        var isPaused = true, isEmptyCaptcha = true;
+        do {
+          await captcha_image.screenshot({ path: "captcha.png" });
+
+          // check if captcha is empty
+          looksSame('captcha.png', 'empty.png', { strict: true }, function (error, { equal }) {
+            isEmptyCaptcha = equal;
+            isPaused = false;
+          });
+
+          if (isEmptyCaptcha) {
+            // refresh captcha
+            await page.waitForXPath('//img[contains(@src,"images/refresh-captcha.png")]', 5000);
+            const [refresh_captcha] = await page.$x('//img[contains(@src,"images/refresh-captcha.png")]');
+            if (refresh_captcha) {
+              refresh_captcha.click();
+
+              if (TEST_MODE) {
+                console.log('Clicked refresh captcha icon');
+              }
+
+              await page.waitFor(5000);
+
+              if (TEST_MODE) {
+                console.log('Waited for 5 seconds');
+              }
+            } else {
+              console.log("Can't find refresh captcha!!!");
+            }
+
+            if (TEST_MODE) {
+              console.log('is paused? ' + isPaused);
+              console.log('is empty captcha? ' + isEmptyCaptcha);
+              //take screenshot
+              await page.screenshot({ path: 'refresh-captcha.png', fullPage: true });
+            }
+          }
+          await page.waitFor(500);
+        } while (isPaused || isEmptyCaptcha);
+
         const b64string = await captcha_image.screenshot({ encoding: "base64" });
         const azcaptcha_api_in_page = await browser.newPage();
 
@@ -90,13 +125,17 @@ const puppeteer = require('puppeteer')
 
               if (status == 200 && jsonResponse.status == 1) {
                 captcha_text = jsonResponse.request;
-                console.log('captcha text is: ' + captcha_text);
+
+                if (TEST_MODE) {
+                  console.log('captcha text is: ' + captcha_text);
+                }
               }
             } catch (err) {
               console.error(err);
             }
           });
           await azcaptcha_api_res_page.goto('http://azcaptcha.com/res.php?key=' + api_key + '&action=get&json=1&id=' + responseBody.request);
+          await azcaptcha_api_res_page.waitFor(5000);
           await azcaptcha_api_res_page.close();
         }
       } else {
@@ -105,27 +144,45 @@ const puppeteer = require('puppeteer')
       
       await page.type('#captcha', captcha_text);
     } else {
-      console.log("Captcha Not Required");
+      if (TEST_MODE) {
+        console.log("Captcha Not Required");
+      }
     }
 
     await page.type('#simnumber', '89011325284987856487');
     await page.type('#imeinumber', '326548987889878');
     await page.type('#servicezip', '90210');
 
-    //take screenshot of filled inputs 
-    await page.screenshot({ path: 'filled.png', fullPage: true });
+    if (TEST_MODE) {
+      //take screenshot of filled inputs 
+      await page.screenshot({ path: 'filled.png', fullPage: true });
+    }
 
     //click Continue Button
-    await page.click('button#continueBtn');
+    await page.click('button#continueBtn', { waitUntil: 'domcontentloaded' });
 
     //wait for response from specified script for #errorAlert
     await page.on('response', async (response) => {
       if (response.url().endsWith("inquireDeviceProfileDetails"))
         console.log(await response.text());
     });
-    await page.waitForSelector('#errorAlert')
 
-    //take screenshot after submitting
-    await page.screenshot({ path: 'submitted.png', fullPage: true })
-    await browser.close()
+    await page.waitFor(5000);
+
+    if ((await page.$('#errorAlert')) !== null) {
+      if(TEST_MODE) {
+        console.log('Error Alert');
+      }
+    } else {
+      if (TEST_MODE) {
+        console.log('Could not find error alert');
+      }
+    }
+
+    if (TEST_MODE) {
+      //take screenshot after submitting
+      await page.screenshot({ path: 'submitted.png', fullPage: true })
+    }
+
+    await browser.close();
   })()

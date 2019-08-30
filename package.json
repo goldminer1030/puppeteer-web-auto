@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/goldminer1030/puppeteer-web-auto#readme",
   "dependencies": {
+    "looks-same": "^7.2.1",
     "puppeteer": "^1.19.0"
   }
 }
