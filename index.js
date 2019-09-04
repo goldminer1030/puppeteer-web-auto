@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const TEST_MODE = false;
 async function run() {
   return new Promise(async (resolve, reject) => {
     try {
@@ -9,7 +10,6 @@ async function run() {
         headless: true,
       })
       const api_key = "ztycfcgjvmeloqeadofkxuiy4nudqr21";
-      const TEST_MODE = true;
       const page = await browser.newPage();
       const client = await page.target().createCDPSession();
       await client.send('Network.clearBrowserCookies');
@@ -179,12 +179,6 @@ async function run() {
 
       //wait for response from specified script for #errorAlert
       const res = await waitForResponse(page, "https://www.att.com/prepaid/activations/services/resources/unauth/activation/inquireDeviceProfileDetails");
-      // await page.on('response', async (response) => {
-      //   if (response.url().endsWith("inquireDeviceProfileDetails"))
-      //     console.log(await response.text());
-      // });
-
-      // await page.waitFor(5000);
 
       if ((await page.$('#errorAlert')) !== null) {
         if(TEST_MODE) {
@@ -209,14 +203,37 @@ async function run() {
   })
 }
 
+function getDeveloperCodeFromResponse(response) {
+  var messages;
+  if ("InquireSIMStatusResponse" in response && "Result" in response['InquireSIMStatusResponse'] && 
+    "Messages" in response['InquireSIMStatusResponse']['Result']) {
+    messages = response['InquireSIMStatusResponse']['Result']['Messages'];
+  } else if ("Result" in response && "Messages" in response['Result']) {
+    messages = response['Result']['Messages'];
+  }
+
+  if (messages.length > 0 && "DeveloperCode" in messages[0]) {
+    return messages[0]['DeveloperCode'];
+  }
+
+  return "NONE";
+}
+
 function runOnce() {
   run().then(response => {
-    if ("Messages" in response['Result']) {
+    var responseCode = getDeveloperCodeFromResponse(response);
+    
+    if (responseCode === "GA701" || responseCode === "NONE") {
       runOnce();
     } else {
       console.log(response);
     }
-  }).catch(console.error);
+  }).catch(function (error) {
+    if (TEST_MODE) {
+      console.log(error);
+    }
+    runOnce();
+  });
 }
 
 runOnce();
